@@ -1,0 +1,83 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Retrain Model - Upload Test</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    #log { white-space: pre-wrap; background:#f6f6f6; border:1px solid #ddd; padding:12px; height:300px; overflow:auto }
+    button { margin-top:8px }
+  </style>
+</head>
+<body>
+  <h2>Retrain Model - Upload Test</h2>
+  <input type="file" id="fileInput" accept=".csv" />
+  <br/>
+  <button id="uploadBtn">Upload & Retrain</button>
+  <h3>Progress</h3>
+  <div id="log">No activity yet.</div>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const log = document.getElementById('log');
+
+    function appendLog(txt){
+      if(log.textContent === 'No activity yet.') log.textContent = '';
+      log.textContent += txt + '\n';
+      log.scrollTop = log.scrollHeight;
+    }
+
+    uploadBtn.addEventListener('click', async () => {
+      const file = fileInput.files[0];
+      if(!file){
+        alert('Please select a CSV file');
+        return;
+      }
+
+      appendLog('Uploading file...');
+      const fd = new FormData();
+      fd.append('file', file);
+
+      try{
+        const res = await fetch('/retrain', { method: 'POST', body: fd });
+        if(!res.body){
+          const text = await res.text();
+          appendLog('Server did not return a streaming body, response: ' + text);
+          return;
+        }
+
+        appendLog('Streaming training logs...');
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+        while(true){
+          const {done, value} = await reader.read();
+          if(done) break;
+          buf += decoder.decode(value, {stream:true});
+          // split into lines
+          let lines = buf.split('\n');
+          buf = lines.pop(); // last may be partial
+          for(const line of lines){
+            if(!line.trim()) continue;
+            try{
+              const obj = JSON.parse(line);
+              if(obj.type === 'progress') appendLog('[PROGRESS] ' + obj.data);
+              else if(obj.type === 'result') appendLog('[RESULT] ' + JSON.stringify(obj.data));
+              else appendLog(line);
+            }catch(e){
+              appendLog(line);
+            }
+          }
+        }
+        if(buf){
+          try{ const obj = JSON.parse(buf); if(obj.type === 'result') appendLog('[RESULT] ' + JSON.stringify(obj.data)); else appendLog(buf); }catch(e){ appendLog(buf); }
+        }
+        appendLog('Streaming finished.');
+      }catch(err){
+        appendLog('Upload error: ' + err.message);
+      }
+    });
+  </script>
+</body>
+</html>

@@ -28,3 +28,7 @@ google-auth
 # Environment & Config
 python-decouple
 python-dotenv
+Flask
+flask-cors
+tensorflow
+joblib

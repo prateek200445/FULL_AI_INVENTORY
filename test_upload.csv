@@ -1,0 +1,11 @@
+date,sales,product_id,category,region,rating,price,discount
+2025-10-01,45,P001,Electronics,North,4.5,299.99,10
+2025-10-02,52,P001,Electronics,North,4.5,299.99,10
+2025-10-03,48,P001,Electronics,North,4.5,299.99,15
+2025-10-04,55,P001,Electronics,North,4.6,289.99,15
+2025-10-05,61,P001,Electronics,North,4.6,289.99,20
+2025-10-06,58,P001,Electronics,North,4.7,279.99,20
+2025-10-07,63,P001,Electronics,North,4.7,279.99,25
+2025-10-08,67,P002,Home,South,4.2,149.99,5
+2025-10-09,72,P002,Home,South,4.3,149.99,10
+2025-10-10,68,P002,Home,South,4.3,139.99,10
