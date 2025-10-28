@@ -1,3 +1,8 @@
+import os
+# Suppress TensorFlow logging
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -7,11 +12,11 @@ from tariff_impact_model import TariffImpactModel
 
 app = FastAPI(title="Tariff Impact Analysis API", version="1.0.0")
 
-# Configure CORS to allow all origins
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,  # Must be False when using allow_origins=["*"]
     allow_methods=["*"],
     allow_headers=["*"],
 )

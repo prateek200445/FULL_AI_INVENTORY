@@ -8,7 +8,7 @@ import json
 import os
 
 # Configure Gemini API with safety settings and API version
-GEMINI_API_KEY = 'AIzaSyCC9n_Uy30m5VW0SQhnnATzg2dPKmjx42g'
+GEMINI_API_KEY = 'AIzaSyBUNRjNbCKTmWuSrCYs9WiuT_U8z0SXs5M'
 
 # Configure the client
 genai.configure(

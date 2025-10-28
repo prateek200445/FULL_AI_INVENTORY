@@ -7,6 +7,10 @@ from prophet import Prophet
 import logging
 import json
 from pathlib import Path
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense, Dropout
+from sklearn.preprocessing import MinMaxScaler
 
 # Configure logging
 logging.getLogger('prophet').setLevel(logging.ERROR)  # Reduce Prophet debugging output
@@ -19,9 +23,74 @@ df = pd.read_csv("large_dataset.csv")
 df['date'] = pd.to_datetime(df['date'])
 df = df.sort_values('date')  # Ensure data is sorted by date
 
+class LSTMModel:
+    def __init__(self, sequence_length=10):
+        self.model = None
+        self.scaler = MinMaxScaler(feature_range=(0, 1))
+        self.sequence_length = sequence_length
+        
+    def create_sequences(self, data):
+        X = []
+        y = []
+        for i in range(len(data) - self.sequence_length):
+            X.append(data[i:(i + self.sequence_length)])
+            y.append(data[i + self.sequence_length])
+        return np.array(X), np.array(y)
+    
+    def build_model(self, input_shape):
+        model = Sequential([
+            LSTM(50, activation='relu', input_shape=input_shape, return_sequences=True),
+            Dropout(0.2),
+            LSTM(50, activation='relu'),
+            Dropout(0.2),
+            Dense(1)
+        ])
+        model.compile(optimizer='adam', loss='mse')
+        return model
+    
+    def train(self, data):
+        # Scale the data
+        scaled_data = self.scaler.fit_transform(data.reshape(-1, 1))
+        
+        # Create sequences
+        X, y = self.create_sequences(scaled_data)
+        
+        # Build and train model
+        self.model = self.build_model((self.sequence_length, 1))
+        self.model.fit(X, y, epochs=50, batch_size=32, verbose=0)
+        
+    def predict(self, data, future_steps):
+        # Scale the data
+        scaled_data = self.scaler.transform(data.reshape(-1, 1))
+        
+        # Get the last sequence
+        last_sequence = scaled_data[-self.sequence_length:]
+        
+        # Make predictions
+        predictions = []
+        current_sequence = last_sequence.copy()
+        
+        for _ in range(future_steps):
+            # Reshape for prediction
+            current_input = current_sequence.reshape(1, self.sequence_length, 1)
+            # Get prediction
+            next_pred = self.model.predict(current_input, verbose=0)
+            # Add to predictions
+            predictions.append(next_pred[0, 0])
+            # Update sequence
+            current_sequence = np.roll(current_sequence, -1)
+            current_sequence[-1] = next_pred
+            
+        # Inverse transform predictions
+        predictions = np.array(predictions).reshape(-1, 1)
+        predictions = self.scaler.inverse_transform(predictions)
+        
+        return predictions.flatten()
+
 class InventoryForecastModel:
     def __init__(self):
-        self.model = None
+        self.prophet_model = None
+        self.lstm_model = LSTMModel()
         self.last_training_date = None
         
     def prepare_data(self, filtered_df):
@@ -31,8 +100,8 @@ class InventoryForecastModel:
         return prophet_df
         
     def train(self, data):
-        # Initialize and train Prophet model
-        self.model = Prophet(
+        # Train Prophet model
+        self.prophet_model = Prophet(
             yearly_seasonality=True,
             weekly_seasonality=True,
             daily_seasonality=True,
@@ -40,7 +109,12 @@ class InventoryForecastModel:
             interval_width=0.95,  # 95% confidence interval
             changepoint_prior_scale=0.05  # Makes trend more flexible
         )
-        self.model.fit(data)
+        self.prophet_model.fit(data)
+        
+        # Train LSTM model
+        sales_data = data['y'].values
+        self.lstm_model.train(sales_data)
+        
         self.last_training_date = data['ds'].max()
 
 # Main forecasting function
@@ -80,13 +154,23 @@ def forecast(days=7, product_id=None, category=None, region=None,
     prophet_data.columns = ['ds', 'y']
     
     model.train(prophet_data)
-    forecast_result = model.model.predict(model.model.make_future_dataframe(periods=int(days), freq='D'))
+    # Get Prophet forecast
+    prophet_forecast = model.prophet_model.predict(model.prophet_model.make_future_dataframe(periods=int(days), freq='D'))
     
-    # Extract relevant forecast dates (last 'days' entries)
-    future_dates = forecast_result['ds'].tail(days)
-    forecast_values = forecast_result['yhat'].tail(days)  # predicted values
-    forecast_lower = forecast_result['yhat_lower'].tail(days)  # lower bound
-    forecast_upper = forecast_result['yhat_upper'].tail(days)  # upper bound
+    # Get LSTM forecast
+    sales_data = prophet_data['y'].values
+    lstm_forecast = model.lstm_model.predict(sales_data, days)
+    
+    # Combine forecasts (simple average)
+    future_dates = prophet_forecast['ds'].tail(days)
+    prophet_values = prophet_forecast['yhat'].tail(days).values
+    
+    # Combine predictions (weighted average: 0.6 Prophet, 0.4 LSTM)
+    forecast_values = 0.6 * prophet_values + 0.4 * lstm_forecast
+    
+    # Use Prophet's uncertainty intervals
+    forecast_lower = prophet_forecast['yhat_lower'].tail(days)
+    forecast_upper = prophet_forecast['yhat_upper'].tail(days)
 
     # Calculate inventory parameters using Prophet's predictions
     avg_daily_demand = forecast_values.mean()
@@ -188,6 +272,54 @@ def forecast(days=7, product_id=None, category=None, region=None,
     
     # warnings list is already created above
 
+    # Plot forecast
+    plt.figure(figsize=(12,6))
+    
+    # Plot historical data from filtered dataset
+    plt.plot(filtered_df.groupby('date')['sales'].sum(), 
+             label=f"Historical Data ({context_str})", 
+             alpha=0.6)
+    
+    # Plot forecast
+    plt.plot(future_dates, forecast_values, 
+             label="Forecast", 
+             linestyle="dashed", 
+             color='green', 
+             linewidth=2)
+    
+    # Plot inventory levels
+    plt.axhline(y=reorder_point, color="red", linestyle="--", label="Reorder Point")
+    plt.axhline(y=safety_stock, color="orange", linestyle="--", label="Safety Stock")
+    plt.axhline(y=max_level, color="purple", linestyle=":", label="Maximum Level")
+    plt.axhline(y=min_level, color="yellow", linestyle=":", label="Minimum Level")
+    
+    # Enhance the plot
+    plt.grid(True, alpha=0.3)
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.title(f"Demand Forecast for {context_str}")
+    plt.xlabel("Date")
+    plt.ylabel("Units")
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    # Save the plot to a file
+    plt.savefig("forecast_plot.png")
+    
+    # For direct script execution, show the plot
+    if __name__ == "__main__":
+        plt.show()
+    else:
+        plt.close()
+
+    # Return everything as dictionary (for API)
+    return {
+        "Reorder Point": reorder_point,
+        "Safety Stock": safety_stock,
+        "Minimum Level": min_level,
+        "Maximum Level": max_level,
+        "Forecast": forecast_dict,
+        "Plot File": "forecast_plot.png",  # Add plot file path to response
+        "Warnings": warnings if warnings else ["✅ Inventory levels are healthy."]
+    }
     # Plot forecast
     plt.figure(figsize=(12,6))
     
