@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product QR Code Generator</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .input-section {
+            margin-bottom: 30px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+        
+        button {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-generate {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-generate:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-download {
+            background: #4caf50;
+            color: white;
+        }
+        
+        .btn-download:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+        }
+        
+        .btn-print {
+            background: #ff9800;
+            color: white;
+        }
+        
+        .btn-print:hover {
+            background: #e68900;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 152, 0, 0.4);
+        }
+        
+        .qr-output {
+            text-align: center;
+            background: #f9f9f9;
+            padding: 30px;
+            border-radius: 12px;
+            border: 2px dashed #ddd;
+        }
+        
+        #qrcode {
+            display: inline-block;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .qr-label {
+            margin-top: 15px;
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .preset-products {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .preset-btn {
+            padding: 10px;
+            background: #f0f0f0;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .preset-btn:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        
+        @media print {
+            body {
+                background: white;
+            }
+            
+            .container {
+                box-shadow: none;
+                border: 1px solid #ddd;
+            }
+            
+            .input-section, .button-group, .preset-products {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏷️ Product QR Code Generator</h1>
+        <p class="subtitle">Generate QR codes for your inventory products</p>
+        
+        <div class="input-section">
+            <label for="productId">Product ID:</label>
+            <input type="text" id="productId" placeholder="Enter Product ID (e.g., P001, PROD-12345)" autofocus>
+        </div>
+        
+        <div class="button-group">
+            <button class="btn-generate" onclick="generateQR()">📷 Generate QR Code</button>
+            <button class="btn-download" onclick="downloadQR()">💾 Download PNG</button>
+            <button class="btn-print" onclick="printQR()">🖨️ Print</button>
+        </div>
+        
+        <div class="qr-output">
+            <div id="qrcode"></div>
+            <div class="qr-label" id="qrLabel">Enter a Product ID and click Generate</div>
+        </div>
+        
+        <div class="input-section" style="margin-top: 30px;">
+            <label>Quick Generate (Preset Products):</label>
+            <div class="preset-products">
+                <button class="preset-btn" onclick="quickGenerate('P001')">P001</button>
+                <button class="preset-btn" onclick="quickGenerate('P002')">P002</button>
+                <button class="preset-btn" onclick="quickGenerate('P003')">P003</button>
+                <button class="preset-btn" onclick="quickGenerate('P004')">P004</button>
+                <button class="preset-btn" onclick="quickGenerate('P005')">P005</button>
+                <button class="preset-btn" onclick="quickGenerate('PROD-001')">PROD-001</button>
+                <button class="preset-btn" onclick="quickGenerate('PROD-002')">PROD-002</button>
+                <button class="preset-btn" onclick="quickGenerate('PROD-003')">PROD-003</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentProductId = '';
+
+        function generateQR() {
+            const productId = document.getElementById('productId').value.trim();
+            
+            if (!productId) {
+                alert('Please enter a Product ID');
+                return;
+            }
+            
+            currentProductId = productId;
+            
+            // Clear previous QR code
+            document.getElementById('qrcode').innerHTML = '';
+            
+            // Generate new QR code
+            QRCode.toCanvas(productId, {
+                width: 300,
+                height: 300,
+                color: {
+                    dark: '#000000',
+                    light: '#ffffff'
+                },
+                errorCorrectionLevel: 'H'
+            }, function (err, canvas) {
+                if (err) {
+                    alert('Error generating QR code: ' + err);
+                    return;
+                }
+                document.getElementById('qrcode').appendChild(canvas);
+            });
+            
+            // Update label
+            document.getElementById('qrLabel').textContent = `Product ID: ${productId}`;
+        }
+
+        function quickGenerate(productId) {
+            document.getElementById('productId').value = productId;
+            generateQR();
+        }
+
+        function downloadQR() {
+            if (!currentProductId) {
+                alert('Please generate a QR code first');
+                return;
+            }
+            
+            const canvas = document.querySelector('#qrcode canvas');
+            if (!canvas) {
+                alert('No QR code to download');
+                return;
+            }
+            
+            // Create download link
+            const link = document.createElement('a');
+            link.download = `QR_${currentProductId}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+
+        function printQR() {
+            if (!currentProductId) {
+                alert('Please generate a QR code first');
+                return;
+            }
+            
+            window.print();
+        }
+
+        // Generate on Enter key
+        document.getElementById('productId').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                generateQR();
+            }
+        });
+
+        // Generate default QR code
+        window.onload = function() {
+            document.getElementById('productId').value = 'P001';
+            generateQR();
+        };
+    </script>
+</body>
+</html>

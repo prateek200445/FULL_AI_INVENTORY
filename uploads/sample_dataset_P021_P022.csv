@@ -1,0 +1,7 @@
+date,product_id,category,region,price,discount,rating,sales,profit
+2025-09-01,P021,Electronics,North,14999,10,4.5,320,120000
+2025-09-02,P021,Electronics,North,14999,12,4.6,350,135000
+2025-09-03,P021,Electronics,North,14799,15,4.7,400,150000
+2025-09-01,P022,HomeAppliance,South,8999,8,4.3,280,95000
+2025-09-02,P022,HomeAppliance,South,8799,10,4.2,300,98000
+2025-09-03,P022,HomeAppliance,South,8699,12,4.4,350,105000
